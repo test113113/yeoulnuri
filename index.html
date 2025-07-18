@@ -594,7 +594,11 @@
             <div id="sync-status" style="text-align: center; margin-bottom: 20px; padding: 10px; border-radius: 8px; font-weight: 600;"></div>
             <div style="text-align: center; margin-bottom: 20px;">
                 <button class="btn" onclick="loadFromGoogleSheet()" style="margin-right: 10px;">📥 구글시트에서 불러오기</button>
-                <button class="btn btn-success" onclick="saveToGoogleSheet()">💾 구글시트에 저장</button>
+                <button class="btn btn-success" onclick="saveToGoogleSheet()" style="margin-right: 10px;">💾 구글시트에 저장</button>
+                <button class="btn" onclick="downloadCSV()">📋 CSV 다운로드</button>
+                <p style="margin-top: 10px; color: #6c757d; font-size: 0.9rem;">
+                    💡 구글 시트 연동이 안 될 경우: CSV 다운로드 후 구글 시트에 직접 붙여넣기하세요
+                </p>
             </div>
             <div id="inventory-content">
                 <div class="empty-state">
@@ -628,7 +632,7 @@
 
     <script>
         // 구글 시트 웹앱 URL
-        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbweAt9U1NpEIYD-vRVSKsx5eR-zUOw_ZQyPCrOP65KmqZy-hL1KPeiF3FROn0B3gEU/exec';
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwygyJEgakvNR0dr2RuQ5PRShyKVHGYGaXzmegQX1XRvfPHJ04T7jxBhYZcraeEzNc/exec';
         
         // 재고 데이터를 저장할 객체 (장인별로 구분)
         let inventory = {};
@@ -721,7 +725,7 @@
             }
         }
 
-        // 구글 시트에 데이터 저장 (CORS 우회)
+        // 구글 시트에 데이터 저장 (권한 문제 해결)
         async function saveToGoogleSheet() {
             updateSyncStatus('syncing', '구글 시트에 저장 중...');
             
@@ -733,7 +737,8 @@
                 }
                 
                 // 각 재고 항목을 순차적으로 저장
-                let attempts = 0;
+                let successCount = 0;
+                let errorCount = 0;
                 
                 for (const key of Object.keys(inventory)) {
                     try {
@@ -751,37 +756,43 @@
                         
                         console.log('저장할 데이터:', data);
                         
-                        // CORS 문제 해결을 위해 no-cors 모드 사용
+                        // 일반 fetch 시도 (CORS 허용된 경우)
                         const response = await fetch(GOOGLE_SHEET_URL, {
                             method: 'POST',
-                            mode: 'no-cors',
                             headers: { 
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify(data)
                         });
                         
-                        console.log('응답 타입:', response.type);
-                        attempts++;
+                        if (response.ok) {
+                            const result = await response.text();
+                            console.log('저장 성공:', result);
+                            successCount++;
+                        } else {
+                            console.log('응답 상태:', response.status);
+                            errorCount++;
+                        }
                         
-                        // 각 요청 사이에 짧은 지연
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        // 각 요청 사이에 지연
+                        await new Promise(resolve => setTimeout(resolve, 300));
                         
                     } catch (itemError) {
                         console.error('개별 항목 저장 오류:', itemError);
+                        errorCount++;
                     }
                 }
                 
-                if (attempts > 0) {
-                    updateSyncStatus('online', `${attempts}개 항목을 구글 시트에 전송했습니다. 시트를 확인해주세요.`);
+                if (successCount > 0) {
+                    updateSyncStatus('online', `구글 시트에 ${successCount}개 항목이 성공적으로 저장되었습니다!`);
                     lastSyncTime = new Date();
-                } else {
-                    updateSyncStatus('error', '저장 시도에 실패했습니다.');
+                } else if (errorCount > 0) {
+                    updateSyncStatus('error', `저장에 실패했습니다. 권한을 확인하거나 CSV 다운로드를 이용하세요.`);
                 }
                 
             } catch (error) {
                 console.error('구글 시트 저장 전체 오류:', error);
-                updateSyncStatus('error', `저장 오류: ${error.message}`);
+                updateSyncStatus('error', `저장 오류: Apps Script 권한을 확인하세요. 대안으로 CSV 다운로드를 이용하세요.`);
             }
         }
 
@@ -822,7 +833,40 @@
             }
         }
 
-        // 네트워크 상태 감지
+        // CSV 다운로드 함수 (구글 시트 대안)
+        function downloadCSV() {
+            if (Object.keys(inventory).length === 0) {
+                alert('다운로드할 데이터가 없습니다.');
+                return;
+            }
+            
+            // CSV 헤더
+            let csvContent = '장인,제품명,재고수량,입고누계,출고누계,최종업데이트\n';
+            
+            // 데이터 추가
+            Object.keys(inventory).forEach(key => {
+                const [manager, product] = key.split('|');
+                const item = inventory[key];
+                const history = transactionHistory[key] || { inbound: 0, outbound: 0 };
+                
+                csvContent += `${manager},${product},${item.quantity},${history.inbound},${history.outbound},${item.lastUpdated}\n`;
+            });
+            
+            // 파일 다운로드
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `재고현황_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            updateSyncStatus('online', 'CSV 파일이 다운로드되었습니다. 구글 시트에 직접 업로드하세요.');
+        }
         function handleOnlineStatus() {
             isOnline = navigator.onLine;
             if (isOnline) {
