@@ -335,7 +335,7 @@
             font-size: 1.1rem;
             font-weight: 600;
             color: #2c3e50;
-            transition: color 0.3s ease;
+            transition: all 0.3s ease;
             position: relative;
             padding: 10px 15px;
             border-radius: 8px;
@@ -358,12 +358,9 @@
             height: 0;
         }
 
-        .radio-label input[type="radio"]:checked + .radio-text {
-            color: white;
-        }
-
-        .radio-label input[type="radio"]:checked ~ .radio-label-bg {
+        .radio-label.active {
             background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
             border-color: #007bff;
         }
 
@@ -371,23 +368,6 @@
             position: relative;
             z-index: 2;
             transition: color 0.3s ease;
-        }
-
-        .radio-label-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-            z-index: 1;
-        }
-
-        .radio-label input[type="radio"]:checked {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
-            border-color: #007bff;
         }
 
         .radio-custom {
@@ -568,15 +548,13 @@
                 <div class="form-group">
                     <label>문화재 장인 선택</label>
                     <div class="radio-group">
-                        <label class="radio-label">
+                        <label class="radio-label active" onclick="selectRadio('outbound-manager', '이종문', this)">
                             <input type="radio" name="outbound-manager" value="이종문" checked>
                             <span class="radio-text">이종문</span>
-                            <div class="radio-label-bg"></div>
                         </label>
-                        <label class="radio-label">
+                        <label class="radio-label" onclick="selectRadio('outbound-manager', '이봉주', this)">
                             <input type="radio" name="outbound-manager" value="이봉주">
                             <span class="radio-text">이봉주</span>
-                            <div class="radio-label-bg"></div>
                         </label>
                     </div>
                 </div>
@@ -1011,35 +989,23 @@
             });
         }
 
-        // 라디오 버튼 상태 업데이트 함수
-        function updateRadioButtons() {
-            // 출고 탭 라디오 버튼
-            document.querySelectorAll('input[name="outbound-manager"]').forEach(radio => {
-                const label = radio.closest('.radio-label');
-                if (radio.checked) {
-                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
-                    label.style.color = 'white';
-                    label.style.borderColor = '#007bff';
-                } else {
-                    label.style.background = 'white';
-                    label.style.color = '#2c3e50';
-                    label.style.borderColor = '#e9ecef';
-                }
+        // 라디오 버튼 선택 함수
+        function selectRadio(name, value, element) {
+            // 같은 그룹의 모든 라디오 레이블에서 active 클래스 제거
+            const group = document.querySelectorAll(`input[name="${name}"]`);
+            group.forEach(radio => {
+                radio.closest('.radio-label').classList.remove('active');
+                radio.checked = false;
             });
             
-            // 입고 탭 라디오 버튼
-            document.querySelectorAll('input[name="inbound-manager"]').forEach(radio => {
-                const label = radio.closest('.radio-label');
-                if (radio.checked) {
-                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
-                    label.style.color = 'white';
-                    label.style.borderColor = '#007bff';
-                } else {
-                    label.style.background = 'white';
-                    label.style.color = '#2c3e50';
-                    label.style.borderColor = '#e9ecef';
-                }
-            });
+            // 선택된 라디오 버튼 활성화
+            element.classList.add('active');
+            element.querySelector('input').checked = true;
+        }
+
+        // 라디오 버튼 상태 업데이트 함수 (기존 함수 단순화)
+        function updateRadioButtons() {
+            // 이제 selectRadio 함수로 처리하므로 빈 함수로 유지
         }
 
         let currentModalType = '';
@@ -1199,7 +1165,7 @@
             if (handleOutbound(productName, quantity, memo, manager)) {
                 this.reset();
                 // 라디오 버튼 기본값으로 재설정
-                document.querySelector('input[name="outbound-manager"][value="이종문"]').checked = true;
+                selectRadio('outbound-manager', '이종문', document.querySelector('input[name="outbound-manager"][value="이종문"]').closest('.radio-label'));
             }
         });
 
@@ -1220,7 +1186,7 @@
             if (handleInbound(productName, quantity, memo, manager)) {
                 this.reset();
                 // 라디오 버튼 기본값으로 재설정
-                document.querySelector('input[name="inbound-manager"][value="이종문"]').checked = true;
+                selectRadio('inbound-manager', '이종문', document.querySelector('input[name="inbound-manager"][value="이종문"]').closest('.radio-label'));
             }
         });
 
