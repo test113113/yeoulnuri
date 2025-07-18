@@ -994,13 +994,36 @@
             // 같은 그룹의 모든 라디오 레이블에서 active 클래스 제거
             const group = document.querySelectorAll(`input[name="${name}"]`);
             group.forEach(radio => {
-                radio.closest('.radio-label').classList.remove('active');
+                const label = radio.closest('.radio-label');
+                label.classList.remove('active');
                 radio.checked = false;
             });
             
             // 선택된 라디오 버튼 활성화
             element.classList.add('active');
-            element.querySelector('input').checked = true;
+            const radioInput = element.querySelector('input[type="radio"]');
+            if (radioInput) {
+                radioInput.checked = true;
+            }
+            
+            console.log(`라디오 선택됨: ${name} = ${value}`); // 디버깅용
+        }
+
+        // 라디오 버튼 초기화 함수
+        function initializeRadioButtons() {
+            // 출고 탭 초기화
+            const outboundDefault = document.querySelector('input[name="outbound-manager"][value="이종문"]');
+            if (outboundDefault) {
+                outboundDefault.checked = true;
+                outboundDefault.closest('.radio-label').classList.add('active');
+            }
+            
+            // 입고 탭 초기화
+            const inboundDefault = document.querySelector('input[name="inbound-manager"][value="이종문"]');
+            if (inboundDefault) {
+                inboundDefault.checked = true;
+                inboundDefault.closest('.radio-label').classList.add('active');
+            }
         }
 
         // 라디오 버튼 상태 업데이트 함수 (기존 함수 단순화)
@@ -1165,7 +1188,8 @@
             if (handleOutbound(productName, quantity, memo, manager)) {
                 this.reset();
                 // 라디오 버튼 기본값으로 재설정
-                selectRadio('outbound-manager', '이종문', document.querySelector('input[name="outbound-manager"][value="이종문"]').closest('.radio-label'));
+                const defaultLabel = document.querySelector('input[name="outbound-manager"][value="이종문"]').closest('.radio-label');
+                selectRadio('outbound-manager', '이종문', defaultLabel);
             }
         });
 
@@ -1186,7 +1210,8 @@
             if (handleInbound(productName, quantity, memo, manager)) {
                 this.reset();
                 // 라디오 버튼 기본값으로 재설정
-                selectRadio('inbound-manager', '이종문', document.querySelector('input[name="inbound-manager"][value="이종문"]').closest('.radio-label'));
+                const defaultLabel = document.querySelector('input[name="inbound-manager"][value="이종문"]').closest('.radio-label');
+                selectRadio('inbound-manager', '이종문', defaultLabel);
             }
         });
 
