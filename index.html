@@ -695,16 +695,42 @@
             }
         }
 
-        // 구글 시트에서 데이터 불러오기
+        // 구글 시트에서 데이터 불러오기 (개선된 버전)
         async function loadFromGoogleSheet() {
             updateSyncStatus('syncing', '구글 시트에서 데이터를 불러오는 중...');
             
             try {
-                const response = await fetch(GOOGLE_SHEET_URL);
-                const data = await response.json();
+                console.log('구글 시트 URL 요청:', GOOGLE_SHEET_URL);
+                
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors'
+                });
+                
+                console.log('응답 상태:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const textResponse = await response.text();
+                console.log('원시 응답:', textResponse);
+                
+                let data;
+                try {
+                    data = JSON.parse(textResponse);
+                } catch (parseError) {
+                    console.error('JSON 파싱 오류:', parseError);
+                    throw new Error('구글 시트에서 올바르지 않은 응답을 받았습니다');
+                }
+                
+                console.log('파싱된 데이터:', data);
                 
                 if (data.error) {
-                    throw new Error(data.error);
+                    throw new Error(`Apps Script 오류: ${data.error}`);
                 }
                 
                 // 데이터 초기화
@@ -712,44 +738,49 @@
                 transactionHistory = {};
                 
                 // 구글 시트 데이터를 로컬 형식으로 변환
-                data.forEach(row => {
-                    const key = `${row.장인}|${row.제품명}`;
+                if (Array.isArray(data) && data.length > 0) {
+                    data.forEach(row => {
+                        if (row.장인 && row.제품명) {
+                            const key = `${row.장인}|${row.제품명}`;
+                            
+                            inventory[key] = {
+                                quantity: parseInt(row.재고수량) || 0,
+                                lastUpdated: row.최종업데이트 || new Date().toLocaleString('ko-KR')
+                            };
+                            
+                            transactionHistory[key] = {
+                                inbound: parseInt(row.입고누계) || 0,
+                                outbound: parseInt(row.출고누계) || 0
+                            };
+                            
+                            // 제품 목록에 추가 (중복 방지)
+                            if (!productList.includes(row.제품명)) {
+                                productList.push(row.제품명);
+                            }
+                        }
+                    });
                     
-                    inventory[key] = {
-                        quantity: parseInt(row.재고수량) || 0,
-                        lastUpdated: row.최종업데이트 || new Date().toLocaleString('ko-KR')
-                    };
-                    
-                    transactionHistory[key] = {
-                        inbound: parseInt(row.입고누계) || 0,
-                        outbound: parseInt(row.출고누계) || 0
-                    };
-                    
-                    // 제품 목록에 추가 (중복 방지)
-                    if (!productList.includes(row.제품명)) {
-                        productList.push(row.제품명);
-                    }
-                });
+                    updateSyncStatus('online', `구글 시트에서 ${data.length}개 항목을 성공적으로 불러왔습니다`);
+                } else {
+                    updateSyncStatus('online', '구글 시트가 비어있습니다. 새로운 데이터를 입력해주세요.');
+                }
                 
                 // localStorage에도 백업 저장
-                localStorage.setItem('inventory', JSON.stringify(inventory));
-                localStorage.setItem('transactionHistory', JSON.stringify(transactionHistory));
-                localStorage.setItem('productList', JSON.stringify(productList));
+                saveToLocalStorage();
                 
-                updateSyncStatus('online', '구글 시트에서 데이터를 성공적으로 불러왔습니다');
                 updateProductList();
                 updateInventoryTable();
                 
                 lastSyncTime = new Date();
                 
             } catch (error) {
-                console.error('구글 시트 로드 오류:', error);
-                updateSyncStatus('error', '구글 시트에서 데이터를 불러올 수 없습니다. localStorage 데이터를 사용합니다.');
+                console.error('구글 시트 로드 전체 오류:', error);
+                updateSyncStatus('error', `데이터 로드 실패: ${error.message}. localStorage 데이터를 사용합니다.`);
                 loadFromLocalStorage();
             }
         }
 
-        // 구글 시트에 데이터 저장
+        // 구글 시트에 데이터 저장 (개선된 버전)
         async function saveToGoogleSheet() {
             if (!isOnline) {
                 updateSyncStatus('offline', '인터넷 연결을 확인해주세요');
@@ -759,35 +790,73 @@
             updateSyncStatus('syncing', '구글 시트에 저장 중...');
             
             try {
-                // 모든 재고 데이터를 구글 시트 형식으로 변환하여 개별 저장
-                const promises = Object.keys(inventory).map(async (key) => {
-                    const [manager, product] = key.split('|');
-                    const item = inventory[key];
-                    const history = transactionHistory[key] || { inbound: 0, outbound: 0 };
-                    
-                    const data = {
-                        장인: manager,
-                        제품명: product,
-                        재고수량: item.quantity,
-                        입고누계: history.inbound,
-                        출고누계: history.outbound
-                    };
-                    
-                    return fetch(GOOGLE_SHEET_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                });
+                // 저장할 데이터가 있는지 확인
+                if (Object.keys(inventory).length === 0) {
+                    updateSyncStatus('online', '저장할 데이터가 없습니다');
+                    return;
+                }
                 
-                await Promise.all(promises);
+                // 각 재고 항목을 순차적으로 저장
+                let successCount = 0;
+                let errorCount = 0;
                 
-                updateSyncStatus('online', '구글 시트에 성공적으로 저장되었습니다');
-                lastSyncTime = new Date();
+                for (const key of Object.keys(inventory)) {
+                    try {
+                        const [manager, product] = key.split('|');
+                        const item = inventory[key];
+                        const history = transactionHistory[key] || { inbound: 0, outbound: 0 };
+                        
+                        const data = {
+                            장인: manager,
+                            제품명: product,
+                            재고수량: item.quantity,
+                            입고누계: history.inbound,
+                            출고누계: history.outbound
+                        };
+                        
+                        console.log('저장할 데이터:', data);
+                        
+                        const response = await fetch(GOOGLE_SHEET_URL, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify(data),
+                            mode: 'cors'
+                        });
+                        
+                        const result = await response.text();
+                        console.log('응답:', result);
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            console.error('저장 실패:', response.status, result);
+                            errorCount++;
+                        }
+                        
+                        // 각 요청 사이에 짧은 지연 (API 제한 방지)
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (itemError) {
+                        console.error('개별 항목 저장 오류:', itemError);
+                        errorCount++;
+                    }
+                }
+                
+                if (successCount > 0 && errorCount === 0) {
+                    updateSyncStatus('online', `구글 시트에 ${successCount}개 항목이 성공적으로 저장되었습니다`);
+                    lastSyncTime = new Date();
+                } else if (successCount > 0 && errorCount > 0) {
+                    updateSyncStatus('error', `일부 저장 완료: 성공 ${successCount}개, 실패 ${errorCount}개`);
+                } else {
+                    updateSyncStatus('error', '모든 항목 저장에 실패했습니다. Apps Script 설정을 확인해주세요.');
+                }
                 
             } catch (error) {
-                console.error('구글 시트 저장 오류:', error);
-                updateSyncStatus('error', '구글 시트 저장에 실패했습니다. 나중에 다시 시도해주세요.');
+                console.error('구글 시트 저장 전체 오류:', error);
+                updateSyncStatus('error', `저장 오류: ${error.message}. 네트워크 연결과 Apps Script 권한을 확인해주세요.`);
             }
         }
 
