@@ -991,39 +991,74 @@
 
         // 라디오 버튼 선택 함수
         function selectRadio(name, value, element) {
+            console.log(`라디오 클릭됨: ${name} = ${value}`); // 디버깅용
+            
             // 같은 그룹의 모든 라디오 레이블에서 active 클래스 제거
             const group = document.querySelectorAll(`input[name="${name}"]`);
             group.forEach(radio => {
                 const label = radio.closest('.radio-label');
                 label.classList.remove('active');
+                label.style.background = 'white';
+                label.style.color = '#2c3e50';
+                label.style.borderColor = '#e9ecef';
                 radio.checked = false;
             });
             
             // 선택된 라디오 버튼 활성화
             element.classList.add('active');
+            element.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
+            element.style.color = 'white';
+            element.style.borderColor = '#007bff';
+            
             const radioInput = element.querySelector('input[type="radio"]');
             if (radioInput) {
                 radioInput.checked = true;
             }
             
-            console.log(`라디오 선택됨: ${name} = ${value}`); // 디버깅용
+            console.log(`라디오 선택 완료: ${name} = ${value}`); // 디버깅용
         }
 
         // 라디오 버튼 초기화 함수
         function initializeRadioButtons() {
             // 출고 탭 초기화
-            const outboundDefault = document.querySelector('input[name="outbound-manager"][value="이종문"]');
-            if (outboundDefault) {
-                outboundDefault.checked = true;
-                outboundDefault.closest('.radio-label').classList.add('active');
-            }
+            const outboundLabels = document.querySelectorAll('input[name="outbound-manager"]');
+            outboundLabels.forEach(radio => {
+                const label = radio.closest('.radio-label');
+                if (radio.value === '이종문') {
+                    radio.checked = true;
+                    label.classList.add('active');
+                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
+                    label.style.color = 'white';
+                    label.style.borderColor = '#007bff';
+                } else {
+                    radio.checked = false;
+                    label.classList.remove('active');
+                    label.style.background = 'white';
+                    label.style.color = '#2c3e50';
+                    label.style.borderColor = '#e9ecef';
+                }
+            });
             
             // 입고 탭 초기화
-            const inboundDefault = document.querySelector('input[name="inbound-manager"][value="이종문"]');
-            if (inboundDefault) {
-                inboundDefault.checked = true;
-                inboundDefault.closest('.radio-label').classList.add('active');
-            }
+            const inboundLabels = document.querySelectorAll('input[name="inbound-manager"]');
+            inboundLabels.forEach(radio => {
+                const label = radio.closest('.radio-label');
+                if (radio.value === '이종문') {
+                    radio.checked = true;
+                    label.classList.add('active');
+                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
+                    label.style.color = 'white';
+                    label.style.borderColor = '#007bff';
+                } else {
+                    radio.checked = false;
+                    label.classList.remove('active');
+                    label.style.background = 'white';
+                    label.style.color = '#2c3e50';
+                    label.style.borderColor = '#e9ecef';
+                }
+            });
+            
+            console.log('라디오 버튼 초기화 완료'); // 디버깅용
         }
 
         // 라디오 버튼 상태 업데이트 함수 (기존 함수 단순화)
