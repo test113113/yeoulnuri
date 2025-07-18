@@ -1128,7 +1128,7 @@
             return true;
         }
 
-        // 입고 처리 함수
+        // 입고 처리 함수 (저장 강화)
         function handleInbound(productName, quantity, memo, manager) {
             const key = `${manager}|${productName}`;
             
@@ -1151,10 +1151,18 @@
             // localStorage에 백업 저장
             saveToLocalStorage();
             
-            // 온라인이면 구글 시트에도 저장
-            if (isOnline) {
-                saveToGoogleSheet();
-            }
+            console.log('입고 처리 완료:', {
+                key: key,
+                inventory: inventory[key],
+                history: transactionHistory[key]
+            });
+            
+            // 구글 시트 저장 (강제 실행)
+            saveToGoogleSheet().then(() => {
+                console.log('구글 시트 저장 시도 완료');
+            }).catch(error => {
+                console.error('구글 시트 저장 실패:', error);
+            });
 
             showAlert('inbound-alert', `${manager} - ${productName} ${quantity}개 입고 완료`, 'success');
             return true;
