@@ -176,6 +176,40 @@
             border-bottom: none;
         }
 
+        .sync-status-online {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .sync-status-offline {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .sync-status-syncing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .product-input-group {
             display: flex;
             gap: 15px;
@@ -291,6 +325,7 @@
             display: flex;
             gap: 30px;
             margin-top: 10px;
+            align-items: center;
         }
 
         .radio-label {
@@ -301,41 +336,62 @@
             font-weight: 600;
             color: #2c3e50;
             transition: color 0.3s ease;
+            position: relative;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            background: white;
+            min-width: 120px;
+            justify-content: center;
         }
 
         .radio-label:hover {
             color: #007bff;
+            border-color: #007bff;
+            background: #f8f9ff;
         }
 
         .radio-label input[type="radio"] {
-            display: none;
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .radio-label input[type="radio"]:checked + .radio-text {
+            color: white;
+        }
+
+        .radio-label input[type="radio"]:checked ~ .radio-label-bg {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            border-color: #007bff;
+        }
+
+        .radio-text {
+            position: relative;
+            z-index: 2;
+            transition: color 0.3s ease;
+        }
+
+        .radio-label-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        .radio-label input[type="radio"]:checked {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border-color: #007bff;
         }
 
         .radio-custom {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #dee2e6;
-            border-radius: 50%;
-            margin-right: 10px;
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .radio-label input[type="radio"]:checked + .radio-custom {
-            border-color: #007bff;
-            background: #007bff;
-        }
-
-        .radio-label input[type="radio"]:checked + .radio-custom::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background: white;
-            border-radius: 50%;
+            display: none;
         }
 
         .stock-alert {
@@ -514,13 +570,13 @@
                     <div class="radio-group">
                         <label class="radio-label">
                             <input type="radio" name="outbound-manager" value="이종문" checked>
-                            <span class="radio-custom"></span>
-                            이종문
+                            <span class="radio-text">이종문</span>
+                            <div class="radio-label-bg"></div>
                         </label>
                         <label class="radio-label">
                             <input type="radio" name="outbound-manager" value="이봉주">
-                            <span class="radio-custom"></span>
-                            이봉주
+                            <span class="radio-text">이봉주</span>
+                            <div class="radio-label-bg"></div>
                         </label>
                     </div>
                 </div>
@@ -598,11 +654,16 @@
         <!-- 재고 현황 탭 -->
         <div id="inventory" class="tab-content">
             <h2>재고 현황</h2>
-            <div id="current-datetime" style="text-align: center; font-size: 20pt; font-weight: bold; color: #2c3e50; margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"></div>
+            <div id="current-datetime" style="text-align: center; font-size: 20pt; font-weight: bold; color: #2c3e50; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"></div>
+            <div id="sync-status" style="text-align: center; margin-bottom: 20px; padding: 10px; border-radius: 8px; font-weight: 600;"></div>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button class="btn" onclick="loadFromGoogleSheet()" style="margin-right: 10px;">📥 구글시트에서 불러오기</button>
+                <button class="btn btn-success" onclick="saveToGoogleSheet()">💾 구글시트에 저장</button>
+            </div>
             <div id="inventory-content">
                 <div class="empty-state">
-                    <h3>재고 데이터가 없습니다</h3>
-                    <p>입고 또는 출고를 진행하면 재고 현황이 표시됩니다.</p>
+                    <h3>재고 데이터를 불러오는 중...</h3>
+                    <p>구글 시트에서 데이터를 가져오고 있습니다.</p>
                 </div>
             </div>
         </div>
@@ -630,10 +691,13 @@
     </div>
 
     <script>
-        // 재고 데이터를 저장할 객체
+        // 구글 시트 웹앱 URL
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwQypWzD5JbnnmGR44Q354O9VRm_fkAdZHseoY6gX7fkr0UII8dkAvecZA1Tk-yvh4/exec';
+        
+        // 재고 데이터를 저장할 객체 (장인별로 구분)
         let inventory = {};
         
-        // 입출고 기록을 저장할 객체
+        // 입출고 기록을 저장할 객체 (장인별로 구분)
         let transactionHistory = {};
         
         // 제품 목록을 저장할 배열
@@ -645,7 +709,180 @@
             '유기술잔',
             '유기수세미'
         ];
+        
+        // 동기화 상태
+        let isOnline = navigator.onLine;
+        let lastSyncTime = null;
 
+        // 동기화 상태 표시
+        function updateSyncStatus(status, message) {
+            const syncStatus = document.getElementById('sync-status');
+            const now = new Date().toLocaleString('ko-KR');
+            
+            switch(status) {
+                case 'online':
+                    syncStatus.className = 'sync-status-online';
+                    syncStatus.innerHTML = `🟢 온라인 - ${message} (${now})`;
+                    break;
+                case 'offline':
+                    syncStatus.className = 'sync-status-offline';
+                    syncStatus.innerHTML = `🔴 오프라인 - ${message}`;
+                    break;
+                case 'syncing':
+                    syncStatus.className = 'sync-status-syncing';
+                    syncStatus.innerHTML = `<span class="loading"></span>동기화 중... ${message}`;
+                    break;
+                case 'error':
+                    syncStatus.className = 'sync-status-offline';
+                    syncStatus.innerHTML = `⚠️ 오류 - ${message}`;
+                    break;
+            }
+        }
+
+        // 구글 시트에서 데이터 불러오기
+        async function loadFromGoogleSheet() {
+            updateSyncStatus('syncing', '구글 시트에서 데이터를 불러오는 중...');
+            
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // 데이터 초기화
+                inventory = {};
+                transactionHistory = {};
+                
+                // 구글 시트 데이터를 로컬 형식으로 변환
+                data.forEach(row => {
+                    const key = `${row.장인}|${row.제품명}`;
+                    
+                    inventory[key] = {
+                        quantity: parseInt(row.재고수량) || 0,
+                        lastUpdated: row.최종업데이트 || new Date().toLocaleString('ko-KR')
+                    };
+                    
+                    transactionHistory[key] = {
+                        inbound: parseInt(row.입고누계) || 0,
+                        outbound: parseInt(row.출고누계) || 0
+                    };
+                    
+                    // 제품 목록에 추가 (중복 방지)
+                    if (!productList.includes(row.제품명)) {
+                        productList.push(row.제품명);
+                    }
+                });
+                
+                // localStorage에도 백업 저장
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                localStorage.setItem('transactionHistory', JSON.stringify(transactionHistory));
+                localStorage.setItem('productList', JSON.stringify(productList));
+                
+                updateSyncStatus('online', '구글 시트에서 데이터를 성공적으로 불러왔습니다');
+                updateProductList();
+                updateInventoryTable();
+                
+                lastSyncTime = new Date();
+                
+            } catch (error) {
+                console.error('구글 시트 로드 오류:', error);
+                updateSyncStatus('error', '구글 시트에서 데이터를 불러올 수 없습니다. localStorage 데이터를 사용합니다.');
+                loadFromLocalStorage();
+            }
+        }
+
+        // 구글 시트에 데이터 저장
+        async function saveToGoogleSheet() {
+            if (!isOnline) {
+                updateSyncStatus('offline', '인터넷 연결을 확인해주세요');
+                return;
+            }
+            
+            updateSyncStatus('syncing', '구글 시트에 저장 중...');
+            
+            try {
+                // 모든 재고 데이터를 구글 시트 형식으로 변환하여 개별 저장
+                const promises = Object.keys(inventory).map(async (key) => {
+                    const [manager, product] = key.split('|');
+                    const item = inventory[key];
+                    const history = transactionHistory[key] || { inbound: 0, outbound: 0 };
+                    
+                    const data = {
+                        장인: manager,
+                        제품명: product,
+                        재고수량: item.quantity,
+                        입고누계: history.inbound,
+                        출고누계: history.outbound
+                    };
+                    
+                    return fetch(GOOGLE_SHEET_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                });
+                
+                await Promise.all(promises);
+                
+                updateSyncStatus('online', '구글 시트에 성공적으로 저장되었습니다');
+                lastSyncTime = new Date();
+                
+            } catch (error) {
+                console.error('구글 시트 저장 오류:', error);
+                updateSyncStatus('error', '구글 시트 저장에 실패했습니다. 나중에 다시 시도해주세요.');
+            }
+        }
+
+        // localStorage에서 데이터 불러오기 (백업용)
+        function loadFromLocalStorage() {
+            try {
+                const savedInventory = localStorage.getItem('inventory');
+                const savedHistory = localStorage.getItem('transactionHistory');
+                const savedProducts = localStorage.getItem('productList');
+                
+                if (savedInventory) inventory = JSON.parse(savedInventory);
+                if (savedHistory) transactionHistory = JSON.parse(savedHistory);
+                if (savedProducts) productList = JSON.parse(savedProducts);
+                
+                updateProductList();
+                updateInventoryTable();
+                
+                if (Object.keys(inventory).length > 0) {
+                    updateSyncStatus('offline', 'localStorage에서 백업 데이터를 불러왔습니다');
+                } else {
+                    updateSyncStatus('offline', '저장된 데이터가 없습니다');
+                }
+                
+            } catch (error) {
+                console.error('localStorage 로드 오류:', error);
+                updateSyncStatus('error', '백업 데이터를 불러올 수 없습니다');
+            }
+        }
+
+        // localStorage에 백업 저장
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                localStorage.setItem('transactionHistory', JSON.stringify(transactionHistory));
+                localStorage.setItem('productList', JSON.stringify(productList));
+            } catch (error) {
+                console.error('localStorage 저장 오류:', error);
+            }
+        }
+
+        // 네트워크 상태 감지
+        function handleOnlineStatus() {
+            isOnline = navigator.onLine;
+            if (isOnline) {
+                updateSyncStatus('online', '인터넷에 연결되었습니다');
+                // 온라인 상태가 되면 자동으로 구글 시트와 동기화
+                setTimeout(loadFromGoogleSheet, 1000);
+            } else {
+                updateSyncStatus('offline', '인터넷 연결이 끊어졌습니다. localStorage를 사용합니다');
+            }
+        }
         // 현재 날짜와 시간을 업데이트하는 함수
         function updateDateTime() {
             const now = new Date();
@@ -712,6 +949,7 @@
                 <table class="inventory-table">
                     <thead>
                         <tr>
+                            <th>장인</th>
                             <th>제품명</th>
                             <th>입고수</th>
                             <th>출고수</th>
@@ -722,15 +960,17 @@
                     <tbody>
             `;
 
-            Object.keys(inventory).forEach(product => {
-                const item = inventory[product];
-                const history = transactionHistory[product] || { inbound: 0, outbound: 0 };
+            Object.keys(inventory).forEach(key => {
+                const [manager, product] = key.split('|');
+                const item = inventory[key];
+                const history = transactionHistory[key] || { inbound: 0, outbound: 0 };
                 const stockNote = item.quantity < 50 ? 
                     '<span class="stock-alert">재고부족</span>' : 
                     '<span class="stock-ok">정상</span>';
                 
                 tableHTML += `
                     <tr>
+                        <td><strong>${manager}</strong></td>
                         <td><strong>${product}</strong></td>
                         <td>${history.inbound.toLocaleString()}개</td>
                         <td>${history.outbound.toLocaleString()}개</td>
@@ -768,6 +1008,37 @@
                 option2.value = product;
                 option2.textContent = product;
                 inboundSelect.appendChild(option2);
+            });
+        }
+
+        // 라디오 버튼 상태 업데이트 함수
+        function updateRadioButtons() {
+            // 출고 탭 라디오 버튼
+            document.querySelectorAll('input[name="outbound-manager"]').forEach(radio => {
+                const label = radio.closest('.radio-label');
+                if (radio.checked) {
+                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
+                    label.style.color = 'white';
+                    label.style.borderColor = '#007bff';
+                } else {
+                    label.style.background = 'white';
+                    label.style.color = '#2c3e50';
+                    label.style.borderColor = '#e9ecef';
+                }
+            });
+            
+            // 입고 탭 라디오 버튼
+            document.querySelectorAll('input[name="inbound-manager"]').forEach(radio => {
+                const label = radio.closest('.radio-label');
+                if (radio.checked) {
+                    label.style.background = 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)';
+                    label.style.color = 'white';
+                    label.style.borderColor = '#007bff';
+                } else {
+                    label.style.background = 'white';
+                    label.style.color = '#2c3e50';
+                    label.style.borderColor = '#e9ecef';
+                }
             });
         }
 
@@ -840,28 +1111,39 @@
 
         // 출고 처리 함수
         function handleOutbound(productName, quantity, memo, manager) {
-            if (!inventory[productName]) {
+            const key = `${manager}|${productName}`;
+            
+            if (!inventory[key]) {
                 showAlert('outbound-alert', '해당 제품이 재고에 없습니다. 먼저 입고를 진행해 주세요.', 'danger');
                 return false;
             }
 
-            if (inventory[productName].quantity < quantity) {
-                showAlert('outbound-alert', `재고 부족: 현재 재고 ${inventory[productName].quantity}개, 요청 수량 ${quantity}개`, 'danger');
+            if (inventory[key].quantity < quantity) {
+                showAlert('outbound-alert', `재고 부족: 현재 재고 ${inventory[key].quantity}개, 요청 수량 ${quantity}개`, 'danger');
                 return false;
             }
 
-            inventory[productName].quantity -= quantity;
-            inventory[productName].lastUpdated = new Date().toLocaleString('ko-KR');
+            inventory[key].quantity -= quantity;
+            inventory[key].lastUpdated = new Date().toLocaleString('ko-KR');
             
             // 출고 기록 추가
-            if (!transactionHistory[productName]) {
-                transactionHistory[productName] = { inbound: 0, outbound: 0 };
+            if (!transactionHistory[key]) {
+                transactionHistory[key] = { inbound: 0, outbound: 0 };
             }
-            transactionHistory[productName].outbound += quantity;
+            transactionHistory[key].outbound += quantity;
             
             // 재고가 0이 되면 제품 삭제
-            if (inventory[productName].quantity === 0) {
-                delete inventory[productName];
+            if (inventory[key].quantity === 0) {
+                delete inventory[key];
+                delete transactionHistory[key];
+            }
+
+            // localStorage에 백업 저장
+            saveToLocalStorage();
+            
+            // 온라인이면 구글 시트에도 저장
+            if (isOnline) {
+                saveToGoogleSheet();
             }
 
             showAlert('outbound-alert', `${manager} - ${productName} ${quantity}개 출고 완료`, 'success');
@@ -870,21 +1152,31 @@
 
         // 입고 처리 함수
         function handleInbound(productName, quantity, memo, manager) {
-            if (!inventory[productName]) {
-                inventory[productName] = {
+            const key = `${manager}|${productName}`;
+            
+            if (!inventory[key]) {
+                inventory[key] = {
                     quantity: 0,
                     lastUpdated: new Date().toLocaleString('ko-KR')
                 };
             }
 
-            inventory[productName].quantity += quantity;
-            inventory[productName].lastUpdated = new Date().toLocaleString('ko-KR');
+            inventory[key].quantity += quantity;
+            inventory[key].lastUpdated = new Date().toLocaleString('ko-KR');
             
             // 입고 기록 추가
-            if (!transactionHistory[productName]) {
-                transactionHistory[productName] = { inbound: 0, outbound: 0 };
+            if (!transactionHistory[key]) {
+                transactionHistory[key] = { inbound: 0, outbound: 0 };
             }
-            transactionHistory[productName].inbound += quantity;
+            transactionHistory[key].inbound += quantity;
+
+            // localStorage에 백업 저장
+            saveToLocalStorage();
+            
+            // 온라인이면 구글 시트에도 저장
+            if (isOnline) {
+                saveToGoogleSheet();
+            }
 
             showAlert('inbound-alert', `${manager} - ${productName} ${quantity}개 입고 완료`, 'success');
             return true;
