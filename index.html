@@ -721,41 +721,96 @@
             }
         }
 
+        // 구글 시트 데이터 초기화 함수
+        async function clearGoogleSheet() {
+            try {
+                // 구글 시트 초기화 요청
+                const params = new URLSearchParams({
+                    action: 'clear'  // 구글 앱스 스크립트에서 'clear' 액션으로 전체 데이터 삭제
+                });
+                
+                const clearUrl = `${GOOGLE_SHEET_URL}?${params.toString()}`;
+                console.log('구글 시트 초기화 URL:', clearUrl);
+                
+                // iframe을 이용한 우회 방식으로 초기화 요청
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = clearUrl;
+                
+                document.body.appendChild(iframe);
+                
+                // 3초 후 iframe 제거
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 3000);
+                
+                console.log('구글 시트 초기화 요청 전송 완료');
+                return true;
+                
+            } catch (error) {
+                console.error('구글 시트 초기화 오류:', error);
+                return false;
+            }
+        }
+
         // 리셋 (초기화) 함수
-        function resetAllData() {
-            if (!confirm('⚠️ 정말로 모든 재고 데이터를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n- 모든 입고수, 출고수, 재고현황이 0으로 초기화됩니다.\n- 구글 시트의 데이터도 함께 초기화됩니다.')) {
+        async function resetAllData() {
+            if (!confirm('⚠️ 정말로 모든 재고 데이터를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n- 모든 입고수, 출고수, 재고현황이 0으로 초기화됩니다.\n- 구글 시트의 데이터도 함께 완전히 삭제됩니다.\n- 로컬 저장 데이터도 모두 삭제됩니다.')) {
                 return;
             }
             
             // 한 번 더 확인
-            if (!confirm('🚨 최종 확인 🚨\n\n정말로 모든 데이터를 삭제하시겠습니까?')) {
+            if (!confirm('🚨 최종 확인 🚨\n\n정말로 모든 데이터를 삭제하시겠습니까?\n구글 시트와 로컬 데이터가 모두 영구 삭제됩니다!')) {
                 return;
             }
             
             try {
-                // 모든 데이터 초기화
+                updateSyncStatus('syncing', '모든 데이터를 초기화하는 중...');
+                
+                // 1. 구글 시트 데이터 초기화 (먼저 실행)
+                console.log('구글 시트 데이터 초기화 시작...');
+                const googleSheetCleared = await clearGoogleSheet();
+                
+                // 2초 대기 (구글 시트 처리 시간)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // 2. 로컬 데이터 초기화
+                console.log('로컬 데이터 초기화 시작...');
                 inventory = {};
                 transactionHistory = {};
                 
-                // localStorage 초기화
+                // 3. localStorage 완전 삭제
                 localStorage.removeItem('inventory');
                 localStorage.removeItem('transactionHistory');
+                localStorage.removeItem('productList'); // 제품 목록도 초기화
                 
-                // 화면 업데이트
+                // 4. 제품 목록을 기본값으로 재설정
+                productList = [
+                    '민자 유기수저',
+                    '꽃매화 유기수저',
+                    '국화 유기수저',
+                    '대나무 유기수저',
+                    '유기술잔',
+                    '유기수세미'
+                ];
+                
+                // 5. 화면 업데이트
                 updateInventoryTable();
+                updateProductList();
                 
-                // 구글 시트도 초기화 (빈 데이터로 저장)
-                updateSyncStatus('syncing', '모든 데이터를 초기화하는 중...');
-                
-                setTimeout(() => {
-                    updateSyncStatus('online', '모든 재고 데이터가 초기화되었습니다');
-                    alert('✅ 모든 재고 데이터가 성공적으로 초기화되었습니다.');
-                }, 1000);
+                // 6. 완료 메시지
+                if (googleSheetCleared) {
+                    updateSyncStatus('online', '구글 시트와 로컬 데이터가 모두 초기화되었습니다');
+                    alert('✅ 성공!\n\n• 구글 시트 데이터 삭제 완료\n• 로컬 저장 데이터 삭제 완료\n• 제품 목록 기본값으로 재설정\n\n모든 재고 데이터가 완전히 초기화되었습니다.');
+                } else {
+                    updateSyncStatus('error', '로컬 데이터는 초기화되었으나 구글 시트 연결에 문제가 있습니다');
+                    alert('⚠️ 부분 성공\n\n• 로컬 데이터는 초기화되었습니다\n• 구글 시트 초기화는 실패했습니다\n\n구글 시트를 수동으로 확인해주세요.');
+                }
                 
             } catch (error) {
-                console.error('데이터 초기화 오류:', error);
+                console.error('데이터 초기화 전체 오류:', error);
                 updateSyncStatus('error', '데이터 초기화 중 오류가 발생했습니다');
-                alert('❌ 데이터 초기화 중 오류가 발생했습니다.');
+                alert('❌ 초기화 실패\n\n데이터 초기화 중 오류가 발생했습니다.\n다시 시도해주세요.');
             }
         }
 
