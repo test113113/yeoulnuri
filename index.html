@@ -32,12 +32,24 @@
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
 
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 10px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
         }
 
         .tabs {
@@ -456,6 +468,13 @@
                 font-size: 2rem;
             }
 
+            .version-badge {
+                top: 15px;
+                right: 15px;
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
             .tabs {
                 flex-direction: column;
             }
@@ -495,6 +514,7 @@
         <div class="header">
             <h1>재고 관리 시스템</h1>
             <p>효율적인 재고 관리를 위한 통합 솔루션</p>
+            <div class="version-badge">Ver 1.0</div>
         </div>
 
         <div class="tabs">
@@ -595,9 +615,11 @@
             <div style="text-align: center; margin-bottom: 20px;">
                 <button class="btn" onclick="loadFromGoogleSheet()" style="margin-right: 10px;">📥 구글시트에서 불러오기</button>
                 <button class="btn btn-success" onclick="saveToGoogleSheet()" style="margin-right: 10px;">💾 구글시트에 저장</button>
-                <button class="btn" onclick="downloadCSV()">📋 CSV 다운로드</button>
+                <button class="btn" onclick="downloadCSV()" style="margin-right: 10px;">📋 CSV 다운로드</button>
+                <button class="btn btn-danger" onclick="resetAllData()">🔄 리셋 (초기화)</button>
                 <p style="margin-top: 10px; color: #6c757d; font-size: 0.9rem;">
-                    💡 구글 시트 연동이 안 될 경우: CSV 다운로드 후 구글 시트에 직접 붙여넣기하세요
+                    💡 구글 시트 연동이 안 될 경우: CSV 다운로드 후 구글 시트에 직접 붙여넣기하세요<br>
+                    ⚠️ 리셋 버튼은 모든 재고 데이터를 0으로 초기화합니다
                 </p>
             </div>
             <div id="inventory-content">
@@ -696,6 +718,44 @@
                     syncStatus.className = 'sync-status-offline';
                     syncStatus.innerHTML = `⚠️ 오류 - ${message}`;
                     break;
+            }
+        }
+
+        // 리셋 (초기화) 함수
+        function resetAllData() {
+            if (!confirm('⚠️ 정말로 모든 재고 데이터를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n- 모든 입고수, 출고수, 재고현황이 0으로 초기화됩니다.\n- 구글 시트의 데이터도 함께 초기화됩니다.')) {
+                return;
+            }
+            
+            // 한 번 더 확인
+            if (!confirm('🚨 최종 확인 🚨\n\n정말로 모든 데이터를 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                // 모든 데이터 초기화
+                inventory = {};
+                transactionHistory = {};
+                
+                // localStorage 초기화
+                localStorage.removeItem('inventory');
+                localStorage.removeItem('transactionHistory');
+                
+                // 화면 업데이트
+                updateInventoryTable();
+                
+                // 구글 시트도 초기화 (빈 데이터로 저장)
+                updateSyncStatus('syncing', '모든 데이터를 초기화하는 중...');
+                
+                setTimeout(() => {
+                    updateSyncStatus('online', '모든 재고 데이터가 초기화되었습니다');
+                    alert('✅ 모든 재고 데이터가 성공적으로 초기화되었습니다.');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('데이터 초기화 오류:', error);
+                updateSyncStatus('error', '데이터 초기화 중 오류가 발생했습니다');
+                alert('❌ 데이터 초기화 중 오류가 발생했습니다.');
             }
         }
 
@@ -863,6 +923,7 @@
             
             updateSyncStatus('online', 'CSV 파일이 다운로드되었습니다. 구글 시트에 직접 업로드하세요.');
         }
+
         function handleOnlineStatus() {
             isOnline = navigator.onLine;
             if (isOnline) {
